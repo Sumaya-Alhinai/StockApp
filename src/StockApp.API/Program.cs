@@ -5,6 +5,8 @@ using StockApp.API.Middleware;
 using StockApp.Application;
 using StockApp.Infrastructure;
 using StockApp.Infrastructure.Security;
+using StockApp.API.Services;
+using StockApp.Application.Common.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,7 +20,8 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString, jwtSettings);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
-
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -50,5 +53,6 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
 
 app.Run();
