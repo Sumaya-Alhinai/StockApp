@@ -17,5 +17,6 @@ export const routes: Routes = [
     canActivate: [authGuard],
     resolve: { products: productsResolver },
     loadComponent: () => import('./features/products/products-page.component').then(m => m.ProductsPageComponent)
-  }
+  },
+  { path: '**', redirectTo: 'products' }
 ];
