@@ -1,1 +1,109 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --border: #e3e6ea;
+  --text: #1f2933;
+  --muted: #6b7684;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --danger: #c0392b;
+  --danger-bg: #fdecea;
+  --warn: #8a6100;
+  --warn-bg: #fff6e0;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+h2, h3, h4 { margin: 0 0 1rem; font-weight: 600; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.15rem; }
+h4 { font-size: 1rem; color: var(--muted); }
+
+input, select, button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+input, select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .55rem .7rem;
+  background: var(--surface);
+  transition: border-color .15s, box-shadow .15s;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+
+button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: .5rem .9rem;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+
+button:hover:not(:disabled) {
+  background: #f0f2f5;
+  border-color: #cfd4da;
+}
+
+button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+button[type="submit"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+
+button[type="submit"]:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+th {
+  background: #f0f2f5;
+  font-weight: 600;
+  font-size: .82rem;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+th, td {
+  padding: .7rem .85rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: #fafbfc; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }

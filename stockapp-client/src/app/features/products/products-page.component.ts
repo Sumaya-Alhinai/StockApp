@@ -56,16 +56,26 @@ import { StockPanelComponent } from './stock-panel.component';
         (remove)="onRemove($event)" />
     </div>
   `,
-  styles: [`
-    .page { max-width: 960px; margin: 2rem auto; font-family: system-ui; padding: 0 1rem; }
-    header { display: flex; justify-content: space-between; align-items: center; }
-    .toolbar { display: flex; gap: .5rem; margin: 1rem 0; }
-    .toolbar input { flex: 1; padding: .5rem; }
-    button { padding: .45rem .9rem; cursor: pointer; }
-    .alert { display: flex; gap: .5rem; align-items: center; background: #fdecea; color: #922; padding: .6rem; border-radius: 4px; margin-bottom: 1rem; }
-    .alert.warn { background: #fff6e0; color: #8a6100; }
-    .alert button { margin-left: auto; border: none; background: none; font-size: 1.2rem; }
-    .loading { color: #888; }
+   styles: [`
+    .page { max-width: 980px; margin: 2.5rem auto; padding: 0 1.25rem; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    header h2 { margin: 0; }
+    .toolbar { display: flex; gap: .6rem; margin-bottom: 1.25rem; }
+    .toolbar input { flex: 1; }
+    .alert {
+      display: flex;
+      gap: .6rem;
+      align-items: center;
+      background: var(--danger-bg);
+      color: var(--danger);
+      padding: .75rem .9rem;
+      border-radius: 6px;
+      margin-bottom: 1.25rem;
+      font-size: .92rem;
+    }
+    .alert.warn { background: var(--warn-bg); color: var(--warn); }
+    .alert button { margin-left: auto; border: none; background: none; font-size: 1.3rem; line-height: 1; padding: 0 .3rem; color: inherit; }
+    .loading { color: var(--muted); font-size: .9rem; }
   `]
 })
 export class ProductsPageComponent implements OnInit {

@@ -48,15 +48,19 @@ import { Product, StockMovement, MovementType } from '../../core/models';
     </div>
   `,
   styles: [`
-    .panel { border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; }
-    label { display: block; margin-bottom: .5rem; }
-    input, select { width: 100%; padding: .4rem; box-sizing: border-box; }
-    .err { color: #c0392b; font-size: .85rem; margin: -.25rem 0 .5rem; }
-    .row { display: flex; gap: .5rem; margin: .75rem 0; }
-    button { padding: .4rem 1rem; cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; }
-    td { padding: .4rem; border-bottom: 1px solid #eee; }
-    .empty { text-align: center; color: #888; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    label { display: block; margin-bottom: .85rem; font-weight: 500; font-size: .9rem; }
+    input, select { width: 100%; margin-top: .3rem; font-weight: 400; }
+    .err { color: var(--danger); font-size: .85rem; margin: -.6rem 0 .85rem; }
+    .row { display: flex; gap: .5rem; margin: 1rem 0; }
+    table { border: 1px solid var(--border); }
+    .empty { text-align: center; color: var(--muted); padding: 1rem; }
   `]
 })
 export class StockPanelComponent implements OnChanges {
