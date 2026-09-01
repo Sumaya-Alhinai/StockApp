@@ -32,34 +32,24 @@ public class AdjustStockCommandValidator
     {
         _db = db;
 
-        // Product ID is required
         RuleFor(x => x.ProductId)
             .NotEmpty()
             .WithMessage("Product ID is required.");
 
-        // Movement type must be In or Out
         RuleFor(x => x.MovementType)
             .IsInEnum()
             .WithMessage("Movement type must be In or Out.");
 
-        // Quantity must always be greater than zero
         RuleFor(x => x.Quantity)
             .GreaterThan(0)
             .WithMessage("Quantity must be greater than zero.");
 
-        // Note is optional, but has a maximum length
         RuleFor(x => x.Note)
             .MaximumLength(500)
             .WithMessage("Note cannot exceed 500 characters.");
 
-        // --------------------------------------------------------
-        // IMPORTANT:
-        // This validation is only a user-friendly pre-check.
-        //
-        // It DOES NOT protect against concurrency/race conditions.
-        // The Handler MUST check the stock again before saving.
-        // --------------------------------------------------------
-
+        // Early stock validation.
+        // The Handler performs the authoritative check again.
         RuleFor(x => x)
             .MustAsync(NotExceedStockOnHand)
             .WithName("Quantity")
@@ -80,7 +70,6 @@ public class AdjustStockCommandValidator
                 cancellationToken);
 
         // Product existence is handled by the Handler.
-        // Therefore, don't produce a stock validation error here.
         if (product is null)
             return true;
 
@@ -111,10 +100,7 @@ public class AdjustStockCommandHandler
         AdjustStockCommand request,
         CancellationToken cancellationToken)
     {
-        // --------------------------------------------------------
-        // 1. Load the product
-        // --------------------------------------------------------
-
+        // 1. Load product
         var product = await _db.Products
             .FirstOrDefaultAsync(
                 p => p.Id == request.ProductId,
@@ -127,31 +113,14 @@ public class AdjustStockCommandHandler
                 request.ProductId);
         }
 
-        // --------------------------------------------------------
         // 2. Calculate stock change
-        // --------------------------------------------------------
-
         var delta = request.MovementType == MovementType.In
             ? request.Quantity
             : -request.Quantity;
 
-        // Example:
-        //
-        // IN  10  -> delta = +10
-        // OUT 10  -> delta = -10
-        //
-
         var newStock = product.StockOnHand + delta;
 
-        // --------------------------------------------------------
-        // 3. AUTHORITATIVE stock check
-        //
-        // This check is extremely important.
-        //
-        // We DO NOT trust the Validator because the database
-        // may have changed after validation.
-        // --------------------------------------------------------
-
+        // 3. Authoritative stock check
         if (newStock < 0)
         {
             throw new ConflictException(
@@ -160,68 +129,39 @@ public class AdjustStockCommandHandler
                 $"Only {product.StockOnHand} in stock.");
         }
 
-        // --------------------------------------------------------
-        // 4. Update current stock
-        // --------------------------------------------------------
-
+        // 4. Update product stock
         product.StockOnHand = newStock;
 
-        // --------------------------------------------------------
-        // 5. Create stock movement history
-        // --------------------------------------------------------
-
+        // 5. Create movement history
         var movement = new StockMovement
         {
             Id = Guid.NewGuid(),
-
             ProductId = product.Id,
-
             MovementType = request.MovementType,
-
             Quantity = request.Quantity,
-
             Note = string.IsNullOrWhiteSpace(request.Note)
                 ? null
                 : request.Note.Trim(),
-
             CreatedByUserId = _currentUser.Id,
-
             CreatedAt = DateTime.UtcNow
         };
 
         _db.StockMovements.Add(movement);
 
-        // --------------------------------------------------------
-        // 6. Save Product + StockMovement atomically
-        //
-        // EF Core executes the SaveChanges operation in a
-        // transaction when multiple changes are being persisted.
-        //
-        // If concurrency fails, neither change should be committed.
-        // --------------------------------------------------------
-
+        // 6. Save changes
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {
-            // ----------------------------------------------------
-            // Another request modified this product after we
-            // loaded it.
-            //
-            // This means our RowVersion/concurrency token no
-            // longer matches the database.
-            // ----------------------------------------------------
-
             throw new ConflictException(
                 "CONCURRENCY_CONFLICT",
                 "This product was modified by another request. " +
                 "Please refresh the stock and retry.");
         }
 
-        
-
+        // 7. Return updated stock
         return product.StockOnHand;
     }
 }

@@ -8,16 +8,25 @@ import { Product, MovementType } from '../../core/models';
 import { ProductListComponent } from './product-list.component';
 import { ProductFormComponent } from './product-form.component';
 import { StockPanelComponent } from './stock-panel.component';
+import { PaginationComponent } from './pagination.component'  // [ترقيم]
+
 
 @Component({
   selector: 'app-products-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProductListComponent, ProductFormComponent, StockPanelComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ProductListComponent,
+    ProductFormComponent,
+    StockPanelComponent,
+    PaginationComponent                                          // [ترقيم]
+  ],
   template: `
     <div class="page">
       <header>
         <h2>Products</h2>
-        <button (click)="auth.logout()">Logout</button>
+        <button (click)="logout()">Logout</button>
       </header>
 
       <div class="toolbar">
@@ -55,6 +64,16 @@ import { StockPanelComponent } from './stock-panel.component';
         (edit)="onEdit($event)"
         (stock)="onStock($event)"
         (remove)="onRemove($event)" />
+
+      <!-- [ترقيم] -->
+      <app-pagination
+        [page]="(products.page$ | async) ?? 1"
+        [pageSize]="(products.pageSize$ | async) ?? 10"
+        [totalCount]="(products.totalCount$ | async) ?? 0"
+        [totalPages]="(products.totalPages$ | async) ?? 0"
+        [disabled]="(products.loading$ | async) ?? false"
+        (pageChange)="onPageChange($event)"
+        (pageSizeChange)="onPageSizeChange($event)" />
     </div>
   `,
   styles: [`
@@ -81,7 +100,7 @@ import { StockPanelComponent } from './stock-panel.component';
 })
 export class ProductsPageComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
-  
+
   products = inject(ProductService);
   auth = inject(AuthService);
 
@@ -91,15 +110,31 @@ export class ProductsPageComponent implements OnInit {
   stockFor: Product | null = null;
 
   ngOnInit(): void {
-    
+    // The only stream here that never completes on its own, so the only one
+    // that needs tearing down. HTTP calls complete after one value.
     this.products.searchResults$
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe();
+      .subscribe({ error: () => {} });
   }
 
   onSearch(term: string): void {
     this.searchTerm = term;
     this.products.setSearch(term);
+  }
+
+  // [ترقيم]
+  onPageChange(page: number): void {
+    this.products.goToPage(page).subscribe({ error: () => {} });
+  }
+
+  // [ترقيم]
+  onPageSizeChange(size: number): void {
+    this.products.setPageSize(size).subscribe({ error: () => {} });
+  }
+
+  logout(): void {
+    this.products.reset();
+    this.auth.logout();
   }
 
   label(code: string): string {
@@ -133,99 +168,72 @@ export class ProductsPageComponent implements OnInit {
   }
 
   onSave(payload: { name: string; sku: string; price: number; category: string | null }): void {
+    const isNew = !this.editing;
+
     const done = () => {
       this.closeForm();
-      this.reload();
+      // A new product sorts first (CreatedAt descending), so jump to page 1 to see it.
+      isNew
+        ? this.products.goToPage(1).subscribe({ error: () => {} })   // [ترقيم]
+        : this.reload();
     };
 
     if (this.editing) {
-   
       this.products.update(this.editing.id, payload)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: done,
-          error: () => {} 
-        });
+        .subscribe({ next: done, error: () => {} });
     } else {
-      // ✅ Create new product
       this.products.create(payload)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: done,
-          error: () => {} 
-        });
+        .subscribe({ next: done, error: () => {} });
     }
   }
 
   onStock(p: Product): void {
     this.stockFor = p;
-    
-    
-    this.products.loadMovements(p.id)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        
-      });
+    this.products.loadMovements(p.id).subscribe({ error: () => {} });
   }
 
   onAdjust(e: { movementType: MovementType; quantity: number; note: string | null }): void {
     if (!this.stockFor) return;
-    
+
     const productId = this.stockFor.id;
 
-    // ✅ Adjust stock
-    this.products.adjustStock(productId, e.movementType, e.quantity, e.note)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => {
-         
-          this.products.loadMovements(productId)
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe();
-          
-          this.reload(() => {
+    this.products.adjustStock(productId, e.movementType, e.quantity, e.note).subscribe({
+      next: () => {
+        this.products.loadMovements(productId).subscribe({ error: () => {} });
 
-            this.products.products$
-              .pipe(takeUntilDestroyed(this.destroyRef))
-              .subscribe(list => {
-                this.stockFor = list.find(p => p.id === productId) ?? null;
-              });
-          });
-        },
-        error: () => {} 
-      });
+        // Read the refreshed list synchronously. Subscribing to products$ here
+        // would register a new permanent listener on every adjustment.
+        this.reload(() => {
+          this.stockFor = this.products.currentProducts.find(p => p.id === productId) ?? null;
+        });
+      },
+      error: () => {}
+    });
   }
 
   onRemove(p: Product): void {
-    this.products.delete(p.id)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => this.reload(),
-        error: (err) => {
-          
-          if (err?.error?.code === 'DELETE_BLOCKED') {
-            this.products.deactivate(p.id)
-              .pipe(takeUntilDestroyed(this.destroyRef))
-              .subscribe({
-                next: () => this.reload(),
-                error: () => {} 
-              });
-          }
-        }
-      });
+    this.products.delete(p.id).subscribe({
+      next: () => this.reload(),
+      error: (err) => {
+        // The API already deactivates a product it refuses to delete,
+        // so calling deactivate again would be a redundant round-trip.
+        if (err?.error?.code === 'DELETE_BLOCKED') this.reload();
+      }
+    });
   }
 
-  /**
-   * Reload products list
-   * 
-   * @param after Optional callback to execute after reload completes
-   */
   private reload(after?: () => void): void {
-    this.products.fetch(this.searchTerm)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => after?.(),
-        error: () => {}
-      });
+    this.products.fetch().subscribe({
+      next: items => {
+        // [ترقيم] Deleting the last row of the last page would leave an empty table.
+        if (items.length === 0 && this.products.currentPage > 1) {
+          this.products.goToPage(this.products.currentPage - 1)
+            .subscribe({ next: () => after?.(), error: () => {} });
+          return;
+        }
+        after?.();
+      },
+      error: () => {}
+    });
   }
 }

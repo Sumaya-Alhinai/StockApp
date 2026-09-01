@@ -36,6 +36,19 @@ export interface StockMovement {
   createdAt: string;
 }
 
+/**
+ * Mirrors PagedResult<T> returned by the API's list endpoints.
+ * Field names must match the JSON exactly (camelCase), otherwise
+ * the values arrive as undefined with no compiler warning.
+ */
+export interface PagedResult<T> {
+  items: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface ApiError {
   code: string;
   message: string;

@@ -10,4 +10,6 @@ public interface IAppDbContext
     DbSet<StockMovement> StockMovements { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    
 }
