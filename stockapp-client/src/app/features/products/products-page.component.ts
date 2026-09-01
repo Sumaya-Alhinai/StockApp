@@ -1,6 +1,7 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ProductService } from '../../core/product.service';
 import { AuthService } from '../../core/auth.service';
 import { Product, MovementType } from '../../core/models';
@@ -56,7 +57,7 @@ import { StockPanelComponent } from './stock-panel.component';
         (remove)="onRemove($event)" />
     </div>
   `,
-   styles: [`
+  styles: [`
     .page { max-width: 980px; margin: 2.5rem auto; padding: 0 1.25rem; }
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
     header h2 { margin: 0; }
@@ -79,6 +80,8 @@ import { StockPanelComponent } from './stock-panel.component';
   `]
 })
 export class ProductsPageComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
+  
   products = inject(ProductService);
   auth = inject(AuthService);
 
@@ -88,7 +91,10 @@ export class ProductsPageComponent implements OnInit {
   stockFor: Product | null = null;
 
   ngOnInit(): void {
-    this.products.searchResults$.subscribe();
+    
+    this.products.searchResults$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe();
   }
 
   onSearch(term: string): void {
@@ -127,62 +133,99 @@ export class ProductsPageComponent implements OnInit {
   }
 
   onSave(payload: { name: string; sku: string; price: number; category: string | null }): void {
-    const done = () => { this.closeForm(); this.reload(); };
+    const done = () => {
+      this.closeForm();
+      this.reload();
+    };
 
     if (this.editing) {
-      this.products.update(this.editing.id, payload).subscribe({
-        next: done,
-        error: () => {}
-      });
+   
+      this.products.update(this.editing.id, payload)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: done,
+          error: () => {} 
+        });
     } else {
-      this.products.create(payload).subscribe({
-        next: done,
-        error: () => {}
-      });
+      // ✅ Create new product
+      this.products.create(payload)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: done,
+          error: () => {} 
+        });
     }
   }
 
   onStock(p: Product): void {
     this.stockFor = p;
-    this.products.loadMovements(p.id).subscribe();
+    
+    
+    this.products.loadMovements(p.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        
+      });
   }
 
   onAdjust(e: { movementType: MovementType; quantity: number; note: string | null }): void {
     if (!this.stockFor) return;
-    const id = this.stockFor.id;
+    
+    const productId = this.stockFor.id;
 
-    this.products.adjustStock(id, e.movementType, e.quantity, e.note).subscribe({
-      next: () => {
-        this.products.loadMovements(id).subscribe();
-        this.reload(() => {
-          this.stockFor = (this.currentList().find(p => p.id === id)) ?? null;
-        });
-      },
-      error: () => {}
-    });
+    // ✅ Adjust stock
+    this.products.adjustStock(productId, e.movementType, e.quantity, e.note)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+         
+          this.products.loadMovements(productId)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe();
+          
+          this.reload(() => {
+
+            this.products.products$
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe(list => {
+                this.stockFor = list.find(p => p.id === productId) ?? null;
+              });
+          });
+        },
+        error: () => {} 
+      });
   }
 
   onRemove(p: Product): void {
-    this.products.delete(p.id).subscribe({
-      next: () => this.reload(),
-      error: (err) => {
-        if (err?.error?.code === 'DELETE_BLOCKED') {
-          this.products.deactivate(p.id).subscribe({ next: () => this.reload() });
+    this.products.delete(p.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => this.reload(),
+        error: (err) => {
+          
+          if (err?.error?.code === 'DELETE_BLOCKED') {
+            this.products.deactivate(p.id)
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: () => this.reload(),
+                error: () => {} 
+              });
+          }
         }
-      }
-    });
+      });
   }
 
-  private currentList(): Product[] {
-    let list: Product[] = [];
-    this.products.products$.subscribe(l => list = l).unsubscribe();
-    return list;
-  }
-
+  /**
+   * Reload products list
+   * 
+   * @param after Optional callback to execute after reload completes
+   */
   private reload(after?: () => void): void {
-    this.products.fetch(this.searchTerm).subscribe({
-      next: () => after?.(),
-      error: () => {}
-    });
+    this.products.fetch(this.searchTerm)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => after?.(),
+        error: () => {}
+      });
   }
 }

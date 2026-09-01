@@ -1,7 +1,8 @@
-import { Component, EventEmitter, Input, Output, inject, OnChanges } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, OnChanges, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Product, StockMovement, MovementType } from '../../core/models';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-stock-panel',
@@ -65,6 +66,7 @@ import { Product, StockMovement, MovementType } from '../../core/models';
 })
 export class StockPanelComponent implements OnChanges {
   private fb = inject(FormBuilder);
+  private destroyRef = inject(DestroyRef);
 
   @Input() product: Product | null = null;
   @Input() movements: StockMovement[] = [];
@@ -79,8 +81,16 @@ export class StockPanelComponent implements OnChanges {
 
   get f() { return this.form.controls; }
 
+  constructor() {
+ 
+    this.form.controls.movementType.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.applyMaxRule());
+  }
+
   ngOnChanges(): void {
-    this.form.controls.movementType.valueChanges.subscribe(() => this.applyMaxRule());
+ 
+    this.form.reset({ movementType: 1, quantity: 1, note: '' });
     this.applyMaxRule();
   }
 
