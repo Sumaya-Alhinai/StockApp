@@ -26,9 +26,14 @@ public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand,
             .AnyAsync(m => m.ProductId == request.Id, ct);
 
         if (hasMovements)
+        {
+            product.IsActive = false;
+            await _db.SaveChangesAsync(ct);
+
             throw new ConflictException(
                 "DELETE_BLOCKED",
                 "This product has stock movement history and cannot be deleted. It has been deactivated instead.");
+        }
 
         _db.Products.Remove(product);
         await _db.SaveChangesAsync(ct);

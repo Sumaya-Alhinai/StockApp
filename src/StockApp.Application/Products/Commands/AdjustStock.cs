@@ -16,8 +16,12 @@ public record AdjustStockCommand(
 
 public class AdjustStockCommandValidator : AbstractValidator<AdjustStockCommand>
 {
-    public AdjustStockCommandValidator()
+    private readonly IAppDbContext _db;
+
+    public AdjustStockCommandValidator(IAppDbContext db)
     {
+        _db = db;
+
         RuleFor(x => x.ProductId).NotEmpty();
 
         RuleFor(x => x.MovementType)
@@ -27,6 +31,24 @@ public class AdjustStockCommandValidator : AbstractValidator<AdjustStockCommand>
             .GreaterThan(0).WithMessage("Quantity must be greater than zero.");
 
         RuleFor(x => x.Note).MaximumLength(500);
+
+        RuleFor(x => x)
+            .MustAsync(NotExceedStockOnHand)
+            .WithName("Quantity")
+            .WithMessage("Stock-out quantity exceeds stock on hand.")
+            .When(x => x.MovementType == MovementType.Out && x.Quantity > 0);
+    }
+
+    private async Task<bool> NotExceedStockOnHand(
+        AdjustStockCommand cmd, CancellationToken ct)
+    {
+        var product = await _db.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == cmd.ProductId, ct);
+
+        if (product is null) return true;
+
+        return cmd.Quantity <= product.StockOnHand;
     }
 }
 

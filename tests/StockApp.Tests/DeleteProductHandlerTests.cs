@@ -75,7 +75,7 @@ public class DeleteProductHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Product_with_movements_is_blocked_from_deletion()
+    public async Task Product_with_movements_is_blocked_and_deactivated()
     {
         var handler = new DeleteProductCommandHandler(_db);
 
@@ -83,7 +83,9 @@ public class DeleteProductHandlerTests : IDisposable
             handler.Handle(new DeleteProductCommand(_usedId), CancellationToken.None));
 
         Assert.Equal("DELETE_BLOCKED", ex.Code);
-        Assert.True(await _db.Products.AnyAsync(p => p.Id == _usedId));
+
+        var product = await _db.Products.AsNoTracking().FirstAsync(p => p.Id == _usedId);
+        Assert.False(product.IsActive);
     }
 
     [Fact]
