@@ -64,6 +64,10 @@ public class DeleteProductHandlerTests : IDisposable
         _db.SaveChanges();
     }
 
+    // ============================================================
+    // DELETE ALLOWED — no movement history
+    // ============================================================
+
     [Fact]
     public async Task Product_without_movements_is_deleted()
     {
@@ -74,8 +78,12 @@ public class DeleteProductHandlerTests : IDisposable
         Assert.False(await _db.Products.AnyAsync(p => p.Id == _cleanId));
     }
 
+    // ============================================================
+    // DELETE BLOCKED — has movement history
+    // ============================================================
+
     [Fact]
-    public async Task Product_with_movements_is_blocked_and_deactivated()
+    public async Task Product_with_movements_is_blocked_and_left_unchanged()
     {
         var handler = new DeleteProductCommandHandler(_db);
 
@@ -84,9 +92,19 @@ public class DeleteProductHandlerTests : IDisposable
 
         Assert.Equal("DELETE_BLOCKED", ex.Code);
 
+        // A rejected delete must leave the database exactly as it found it:
+        // the product still exists and is still active. Deactivation is a
+        // separate, explicit decision made through DeactivateProductCommand.
         var product = await _db.Products.AsNoTracking().FirstAsync(p => p.Id == _usedId);
-        Assert.False(product.IsActive);
+        Assert.True(product.IsActive);
+
+        // The movement history is untouched as well.
+        Assert.Equal(1, await _db.StockMovements.CountAsync(m => m.ProductId == _usedId));
     }
+
+    // ============================================================
+    // DEACTIVATE — the supported alternative to deletion
+    // ============================================================
 
     [Fact]
     public async Task Deactivate_sets_product_inactive()
@@ -98,6 +116,10 @@ public class DeleteProductHandlerTests : IDisposable
         var product = await _db.Products.AsNoTracking().FirstAsync(p => p.Id == _usedId);
         Assert.False(product.IsActive);
     }
+
+    // ============================================================
+    // CLEANUP
+    // ============================================================
 
     public void Dispose()
     {

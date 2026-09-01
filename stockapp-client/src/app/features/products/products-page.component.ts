@@ -8,8 +8,7 @@ import { Product, MovementType } from '../../core/models';
 import { ProductListComponent } from './product-list.component';
 import { ProductFormComponent } from './product-form.component';
 import { StockPanelComponent } from './stock-panel.component';
-import { PaginationComponent } from './pagination.component'  // [ترقيم]
-
+import { PaginationComponent } from './pagination.component';
 
 @Component({
   selector: 'app-products-page',
@@ -20,7 +19,7 @@ import { PaginationComponent } from './pagination.component'  // [ترقيم]
     ProductListComponent,
     ProductFormComponent,
     StockPanelComponent,
-    PaginationComponent                                          // [ترقيم]
+    PaginationComponent
   ],
   template: `
     <div class="page">
@@ -65,7 +64,6 @@ import { PaginationComponent } from './pagination.component'  // [ترقيم]
         (stock)="onStock($event)"
         (remove)="onRemove($event)" />
 
-      <!-- [ترقيم] -->
       <app-pagination
         [page]="(products.page$ | async) ?? 1"
         [pageSize]="(products.pageSize$ | async) ?? 10"
@@ -110,6 +108,11 @@ export class ProductsPageComponent implements OnInit {
   stockFor: Product | null = null;
 
   ngOnInit(): void {
+    // ProductService is root-provided, so the search term outlives this
+    // component. The resolver already fetched with that term — mirror it
+    // into the input box so the field matches the rows being displayed.
+    this.searchTerm = this.products.currentSearch;
+
     // The only stream here that never completes on its own, so the only one
     // that needs tearing down. HTTP calls complete after one value.
     this.products.searchResults$
@@ -122,12 +125,10 @@ export class ProductsPageComponent implements OnInit {
     this.products.setSearch(term);
   }
 
-  // [ترقيم]
   onPageChange(page: number): void {
     this.products.goToPage(page).subscribe({ error: () => {} });
   }
 
-  // [ترقيم]
   onPageSizeChange(size: number): void {
     this.products.setPageSize(size).subscribe({ error: () => {} });
   }
@@ -174,7 +175,7 @@ export class ProductsPageComponent implements OnInit {
       this.closeForm();
       // A new product sorts first (CreatedAt descending), so jump to page 1 to see it.
       isNew
-        ? this.products.goToPage(1).subscribe({ error: () => {} })   // [ترقيم]
+        ? this.products.goToPage(1).subscribe({ error: () => {} })
         : this.reload();
     };
 
@@ -215,9 +216,19 @@ export class ProductsPageComponent implements OnInit {
     this.products.delete(p.id).subscribe({
       next: () => this.reload(),
       error: (err) => {
-        // The API already deactivates a product it refuses to delete,
-        // so calling deactivate again would be a redundant round-trip.
-        if (err?.error?.code === 'DELETE_BLOCKED') this.reload();
+        // DELETE_BLOCKED means nothing changed server-side. Deactivating is a
+        // separate decision, so ask before sending the follow-up request.
+        if (err?.error?.code !== 'DELETE_BLOCKED') return;
+
+        const confirmed = confirm(
+          `"${p.name}" has stock movement history and cannot be deleted. Deactivate it instead?`
+        );
+        if (!confirmed) return;
+
+        this.products.deactivate(p.id).subscribe({
+          next: () => this.reload(),
+          error: () => {}
+        });
       }
     });
   }
@@ -225,7 +236,7 @@ export class ProductsPageComponent implements OnInit {
   private reload(after?: () => void): void {
     this.products.fetch().subscribe({
       next: items => {
-        // [ترقيم] Deleting the last row of the last page would leave an empty table.
+        // Deleting the last row of the last page would leave an empty table.
         if (items.length === 0 && this.products.currentPage > 1) {
           this.products.goToPage(this.products.currentPage - 1)
             .subscribe({ next: () => after?.(), error: () => {} });

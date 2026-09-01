@@ -5,6 +5,15 @@ using StockApp.Application.Common.Interfaces;
 
 namespace StockApp.Application.Products.Commands;
 
+// ============================================================
+// DELETE PRODUCT
+// ============================================================
+// A product with recorded stock movements is part of the audit
+// trail and cannot be removed. The command refuses the request
+// and leaves the database untouched — deactivation is a separate,
+// explicit decision made through DeactivateProductCommand.
+// ============================================================
+
 public record DeleteProductCommand(Guid Id) : IRequest<Unit>;
 
 public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand, Unit>
@@ -27,12 +36,11 @@ public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand,
 
         if (hasMovements)
         {
-            product.IsActive = false;
-            await _db.SaveChangesAsync(ct);
-
+            // No state change before throwing: a failed request must
+            // leave the database exactly as it found it.
             throw new ConflictException(
                 "DELETE_BLOCKED",
-                "This product has stock movement history and cannot be deleted. It has been deactivated instead.");
+                "This product has stock movement history and cannot be deleted. Deactivate it instead.");
         }
 
         _db.Products.Remove(product);
@@ -41,6 +49,14 @@ public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand,
         return Unit.Value;
     }
 }
+
+
+// ============================================================
+// DEACTIVATE PRODUCT
+// ============================================================
+// The supported alternative to deletion. Keeps the product and its
+// movement history intact while removing it from active use.
+// ============================================================
 
 public record DeactivateProductCommand(Guid Id) : IRequest<Unit>;
 
